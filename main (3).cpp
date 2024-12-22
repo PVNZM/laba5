@@ -1,103 +1,312 @@
 #include <iostream>
 #include <fstream>
-#include <cstdlib> // Для rand() и srand()
-#include <ctime>   // Для time
-#include <limits>  // Для std::numeric_limits
-#include <string>  // Для std::string
-#include <algorithm> // Для std::find_if и std::isspace
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <iomanip>
+#include <string>
+#include <cstring>
+#include <limits>
 
-class FileProcessor {
+using namespace std;
+
+// Определение структуры для багажа
+struct Baggage {
+    char name[50]; // Название единицы багажа
+    float weight;  // Масса багажа
+};
+
+class DataProcessor {
 public:
-    // Метод для заполнения файла случайными числами (по одному числу на строку)
-    static void FillFileWithRandomNumbersColumn(const std::string& filePath, int count) {
-        std::ofstream outFile(filePath);
-        if (outFile.is_open()) {
-            for (int i = 0; i < count; ++i) {
-                int randomNumber = rand() % 101; // Генерируем случайное число от 0 до 100
-                outFile << randomNumber << std::endl; // Записываем число в новый столбец
-            }
-            outFile.close();
-        } else {
-            std::cerr << "Не удалось открыть файл для записи" << std::endl;
+    static const int NUM_COUNT = 100; // Количество чисел для бинарного файла
+    static const int BAGGAGE_COUNT = 10; // Количество единиц багажа
+    static const int TEXTFILE_COUNT = 100; // Количество чисел для текстового файла
+    static const int TEXTFILE_MULTIPLE_COUNT = 10; // Числа по несколько в строке для задания 5
+    static const string NUMBERS_FILENAME; // Имя бинарного файла для чисел
+    static const string BAGGAGE_FILENAME; // Имя бинарного файла для багажа
+    static const string TEXT_FILENAME; // Имя текстового файла
+    static const string MULTIPLE_TEXT_FILENAME; // Имя файла для задания 5
+    static const string SOURCE_TEXT_FILENAME;    // Имя исходного текстового файла
+    static const string DESTINATION_TEXT_FILENAME; // Имя конечного текстового файла
+
+    
+    // Метод для заполнения бинарного файла случайными числами
+    static void fillNumbersFile() {
+        ofstream outFile(NUMBERS_FILENAME, ios::binary);
+        if (!outFile) {
+            cerr << "Не удалось открыть файл для записи!" << endl;
+            return;
         }
+
+        srand(static_cast<unsigned int>(time(0)));
+        for (int i = 0; i < NUM_COUNT; ++i) {
+            int number = rand() % 200 - 100; // Генерируем случайное число от -100 до 99
+            outFile.write(reinterpret_cast<const char*>(&number), sizeof(number));
+        }
+
+        outFile.close();
     }
 
-    // Метод для заполнения файла случайными числами (несколько чисел в строке)
-    static void FillFileWithRandomNumbersLine(const std::string& filePath, int count, int numbersPerLine) {
-        std::ofstream outFile(filePath);
-        if (outFile.is_open()) {
-            for (int i = 0; i < count; ++i) {
-                int randomNumber = rand() % 101; // Генерируем случайное число от 0 до 100
-                outFile << randomNumber;
-                if ((i + 1) % numbersPerLine == 0) {
-                    outFile << std::endl; // Переводим на новую строку
-                } else {
-                    outFile << " "; // Разделяем числа пробелом
-                }
-            }
-            outFile.close();
-        } else {
-            std::cerr << "Не удалось открыть файл для записи" << std::endl;
-        }
-    }
-
-    // Метод для проверки, содержит ли файл ноль
-    static bool ContainsZero(const std::string& filePath) {
-        std::ifstream inFile(filePath);
-        if (inFile.is_open()) {
-            int number;
-            while (inFile >> number) {
-                if (number == 0) { // Проверяем на наличие нуля
-                    inFile.close();
-                    return true;
-                }
-            }
-            inFile.close();
-        } else {
-            std::cerr << "Не удалось открыть файл для чтения" << std::endl;
-        }
-        return false;
-    }
-
-    // Метод для нахождения максимального элемента в файле
-    static int FindMaxElement(const std::string& filePath) {
-        std::ifstream inFile(filePath);
-        if (!inFile.is_open()) {
-            std::cerr << "Не удалось открыть файл для чтения" << std::endl;
-            return std::numeric_limits<int>::min(); // Возвращаем минимально возможное значение в случае ошибки открытия файла
+    // Метод для подсчета пар противоположных чисел
+    static int countOppositePairs() {
+        ifstream inFile(NUMBERS_FILENAME, ios::binary);
+        if (!inFile) {
+            cerr << "Не удалось открыть файл для чтения!" << endl;
+            return 0;
         }
 
+        vector<int> numbers;
         int number;
-        int maxElement = std::numeric_limits<int>::min(); // Используем минимально возможное значение для int
-        while (inFile >> number) {
-            if (number > maxElement) {
-                maxElement = number; // Обновляем максимальный элемент
+
+        // Читаем числа из файла
+        while (inFile.read(reinterpret_cast<char*>(&number), sizeof(number))) {
+            numbers.push_back(number);
+        }
+
+        inFile.close();
+
+        int count = 0;
+
+        // Подсчет пар противоположных чисел
+        for (size_t i = 0; i < numbers.size(); ++i) {
+            for (size_t j = i + 1; j < numbers.size(); ++j) {
+                if (numbers[i] + numbers[j] == 0) {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    // Метод для копирования элементов в квадратную матрицу и замены элементов на максимальные в столбцах
+    static void copyToSquareMatrix(int n) {
+        ifstream inFile(NUMBERS_FILENAME, ios::binary);
+        if (!inFile) {
+            cerr << "Не удалось открыть файл для чтения!" << endl;
+            return;
+        }
+
+        vector<vector<int>> matrix(n, vector<int>(n, 0));
+        int number;
+        int index = 0;
+
+        // Заполнение матрицы элементами из файла
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                if (index < NUM_COUNT && inFile.read(reinterpret_cast<char*>(&number), sizeof(number))) {
+                    matrix[i][j] = number;
+                }
+                index++;
             }
         }
 
         inFile.close();
-        return maxElement;
+
+        // Замена элементов на максимальные в каждом столбце
+        for (int j = 0; j < n; ++j) {
+            int maxElement = matrix[0][j];
+            for (int i = 1; i < n; ++i) {
+                if (matrix[i][j] > maxElement) {
+                    maxElement = matrix[i][j];
+                }
+            }
+            for (int i = 0; i < n; ++i) {
+                matrix[i][j] = maxElement;
+            }
+        }
+
+        // Вывод матрицы на экран
+        cout << "Полученная матрица:\n";
+        for (const auto& row : matrix) {
+            for (int val : row) {
+                cout << setw(4) << val << " "; // форматированный вывод
+            }
+            cout << endl;
+        }
     }
 
-    // Метод для переписывания строк, оканчивающихся на заданный символ, в другой файл
-    static void CopyLinesEndingWithChar(const std::string& inputFilePath, const std::string& outputFilePath, char endingChar) {
-        std::ifstream inFile(inputFilePath);
-        std::ofstream outFile(outputFilePath);
-
-        if (!inFile.is_open() || !outFile.is_open()) {
-            std::cerr << "Не удалось открыть файл для чтения или записи" << std::endl;
+    // Метод для заполнения бинарного файла с информацией о багаже
+    static void fillBaggageFile() {
+        ofstream outFile(BAGGAGE_FILENAME, ios::binary);
+        if (!outFile) {
+            cerr << "Не удалось открыть файл для записи багажа!" << endl;
             return;
         }
 
-        std::string line;
-        while (std::getline(inFile, line)) {
-            // Удаляем пробелы в конце строки и проверяем
-            line.erase(std::find_if(line.rbegin(), line.rend(), [](unsigned char ch) {
-                return !std::isspace(ch);
-            }).base(), line.end()); // Удалить пробелы в конце строки
+        string baggageNames[BAGGAGE_COUNT] = {
+            "Чемодан", "Сумка", "Коробка", "Рюкзак", "Дорожная сумка",
+            "Пакет", "Кейс", "Ящик", "Сумка для ноутбука", "Термос"
+        };
 
-            if (!line.empty() && line.back() == endingChar) { // Проверяем, заканчивается ли строка на заданный символ
-                outFile << line << std::endl; // Записываем строку в другой файл
+        srand(static_cast<unsigned int>(time(0)));
+        for (int i = 0; i < BAGGAGE_COUNT; ++i) {
+            Baggage baggage;
+            strncpy(baggage.name, baggageNames[i].c_str(), sizeof(baggage.name) - 1);
+            baggage.name[sizeof(baggage.name) - 1] = '\0'; // Обеспечим нуль-терминатор
+            baggage.weight = (rand() % 200 + 1) / 10.0f; // Генерируем массу от 0.1 до 20.0 кг
+            outFile.write(reinterpret_cast<const char*>(&baggage), sizeof(baggage));
+        }
+
+        outFile.close();
+    }
+
+    // Метод для вычисления разницы между максимальной и минимальной массой багажа
+    static float calculateWeightDifference() {
+        ifstream inFile(BAGGAGE_FILENAME, ios::binary);
+        if (!inFile) {
+            cerr << "Не удалось открыть файл для чтения багажа!" << endl;
+            return 0.0f;
+        }
+
+        Baggage baggage;
+        float maxWeight = 0.0f;
+        float minWeight = numeric_limits<float>::max(); // Минимальное значение инициализируется максимально возможным
+
+        // Читаем данные о багаже и определяем максимальную и минимальную массу
+        while (inFile.read(reinterpret_cast<char*>(&baggage), sizeof(baggage))) {
+            if (baggage.weight > maxWeight) {
+                maxWeight = baggage.weight;
+            }
+            if (baggage.weight < minWeight) {
+                minWeight = baggage.weight;
+            }
+        }
+
+        inFile.close();
+
+        return maxWeight - minWeight; // Возвращаем разницу
+    }
+
+    // Метод для заполнения текстового файла случайными целыми числами
+    static void fillTextFile() {
+        ofstream outFile(TEXT_FILENAME);
+        if (!outFile) {
+            cerr << "Не удалось открыть текстовый файл для записи!" << endl;
+            return;
+        }
+
+        srand(static_cast<unsigned int>(time(0)));
+        for (int i = 0; i < TEXTFILE_COUNT; ++i) {
+            int number = rand() % 200 - 100; // Генерируем случайное число от -100 до 99
+            outFile << number << endl; // Записываем в файл по одному числу в строке
+        }
+
+        outFile.close();
+    }
+
+    // Метод для проверки наличия нуля в текстовом файле
+    static bool containsZeroInFile() {
+        ifstream inFile(TEXT_FILENAME);
+        if (!inFile) {
+            cerr << "Не удалось открыть текстовый файл для чтения!" << endl;
+            return false;
+        }
+
+        int number;
+
+        // Читаем числа из файла и проверяем на наличие нуля
+        while (inFile >> number) {
+            if (number == 0) {
+                inFile.close();
+                return false; // Файл содержит ноль
+            }
+        }
+
+        inFile.close();
+        return true; // Файл не содержит ноль
+    }
+
+    // Метод для заполнения текстового файла случайными целыми числами несколько в строке
+    static void fillMultipleTextFile() {
+        ofstream outFile(MULTIPLE_TEXT_FILENAME);
+        if (!outFile) {
+
+            cerr << "Не удалось открыть текстовый файл для записи!" << endl;
+            return;
+        }
+
+        srand(static_cast<unsigned int>(time(0)));
+        for (int i = 0; i < TEXTFILE_COUNT / TEXTFILE_MULTIPLE_COUNT; ++i) {
+            for (int j = 0; j < TEXTFILE_MULTIPLE_COUNT; ++j) {
+                int number = rand() % 200 - 100; // Генерируем случайное число от -100 до 99
+                if (j > 0) outFile << " "; // Разделитель между числами
+                outFile << number; // Записываем число
+            }
+            outFile << endl; // Переход на новую строку
+        }
+
+        outFile.close();
+    }
+
+    // Метод для нахождения максимального элемента в текстовом файле
+    static int findMaxInMultipleTextFile() {
+        ifstream inFile(MULTIPLE_TEXT_FILENAME);
+        if (!inFile) {
+            cerr << "Не удалось открыть текстовый файл для чтения!" << endl;
+            return 0; // Возможно, имеет смысл возвращать какое-то специальное значение, например, INT_MIN
+        }
+
+        int number;
+        int maxNumber = numeric_limits<int>::min(); // Инициализируем минимальным значением для int
+
+        // Читаем числа из файла и находим максимальное
+        while (inFile >> number) {
+            if (number > maxNumber) {
+                maxNumber = number;
+            }
+        }
+
+        inFile.close();
+        return maxNumber;  // Возвращаем максимальное найденное число
+    }
+
+    // Метод для создания исходного текстового файла с заданным текстом
+    static void createSourceFile() {
+        ofstream outFile(SOURCE_TEXT_FILENAME);
+        if (!outFile) {
+            cerr << "Не удалось открыть файл для записи!" << endl;
+            return;
+        }
+
+        // Записываем текст в файл
+        outFile << "Tyger Tyger, burning bright\n"
+                << "In the forests of the night\n"
+                << "What immortal hand or eye\n"
+                << "Could frame thy fearful symmetry\n"
+                << "In what distant deeps or skies\n"
+                << "Burnt the fire of thine eyes\n"
+                << "On what wings dare he aspire\n"
+                << "What the hand, dare seize the fire\n"
+                << "And what shoulder, & what art\n"
+                << "Could twist the sinews of thy heart\n"
+                << "And when thy heart began to beat\n"
+                << "What dread hand? & what dread feet.\n";
+
+        outFile.close();
+    }
+
+    // Метод для копирования строк, оканчивающихся на 'k'
+    static void copyLinesEndingWithChar(char endingChar) {
+        ifstream inFile(SOURCE_TEXT_FILENAME);
+        if (!inFile) {
+            cerr << "Не удалось открыть исходный текстовый файл для чтения!" << endl;
+            return;
+        }
+
+        ofstream outFile(DESTINATION_TEXT_FILENAME);
+        if (!outFile) {
+            cerr << "Не удалось открыть конечный текстовый файл для записи!" << endl;
+            inFile.close();
+            return;
+        }
+
+        string line;
+        // Читаем строки из исходного файла
+        while (getline(inFile, line)) {
+            // Проверяем, оканчивается ли строка на заданный символ
+            if (!line.empty() && line.back() == endingChar) {
+                outFile << line << endl; // Записываем строку в конечный файл
             }
         }
 
@@ -106,65 +315,62 @@ public:
     }
 };
 
+// Инициализация статических переменных
+const string DataProcessor::NUMBERS_FILENAME = "numbers.dat";
+const string DataProcessor::BAGGAGE_FILENAME = "baggage.dat";
+const string DataProcessor::TEXT_FILENAME = "numbers.txt";
+const string DataProcessor::MULTIPLE_TEXT_FILENAME = "multiple_numbers.txt";
+const string DataProcessor::SOURCE_TEXT_FILENAME = "source_text.txt"; 
+const string DataProcessor::DESTINATION_TEXT_FILENAME = "destination_text.txt"; 
+
 int main() {
-    srand(static_cast<unsigned int>(time(0))); // Инициализация генератора случайных чисел
+    // Заполняем файл случайными числами
+    DataProcessor::fillNumbersFile();
 
-    // Для первого задания
-    std::string file1Path = "file1_numbers.txt"; // Файл с числами в столбец
-    int numbersToGenerate1 = 100; // Количество чисел для первого задания
+    // Задание 1: Подсчёт пар противоположных чисел
+    int oppositePairsCount = DataProcessor::countOppositePairs();
+    cout << "Количество пар противоположных чисел: " << oppositePairsCount << endl;
 
-    // Заполнение файла случайными данными для первого задания
-    FileProcessor::FillFileWithRandomNumbersColumn(file1Path, numbersToGenerate1);
+    // Задание 2: Ввод размерности квадратной матрицы
+    int n;
+    cout << "Введите размерность квадратной матрицы (n): ";
+    cin >> n;
+    DataProcessor::copyToSquareMatrix(n);
 
-    // Проверяем, содержит ли файл нуль
-    bool hasZero1 = FileProcessor::ContainsZero(file1Path);
-    std::cout << "Файл " << file1Path << " содержит ноль: " << (hasZero1 ? "Да" : "Нет") << std::endl;
+    // Задание 3: Заполнение файла с информацией о багаже
+    DataProcessor::fillBaggageFile();
 
-    // Находим максимальный элемент
-    int maxElement1 = FileProcessor::FindMaxElement(file1Path);
-    std::cout << "Максимальный элемент в файле " << file1Path << ": " << maxElement1 << std::endl;
+    // Задание 3: Разница между массами багажа
+    float weightDifference = DataProcessor::calculateWeightDifference();
 
-    // Для второго задания
-    std::string file2Path = "file2_numbers.txt"; // Файл с числами в строку
-    int numbersToGenerate2 = 100; // Общее количество чисел для второго задания
-    int numbersPerLine = 10; // Количество чисел в одной строке
+    cout << "Разница между максимальной и минимальной массой багажа: " << weightDifference << " кг" << endl;
 
-    // Заполнение файла случайными данными для второго задания
-    FileProcessor::FillFileWithRandomNumbersLine(file2Path, numbersToGenerate2, numbersPerLine);
+    // Задание 4: Заполнение текстового файла
+    DataProcessor::fillTextFile();
 
-    // Находим максимальный элемент во втором файле
-    int maxElement2 = FileProcessor::FindMaxElement(file2Path);
-    std::cout << "Максимальный элемент в файле " << file2Path << ": " << maxElement2 << std::endl;
+    // Задание 4: Проверка на наличие нуля в текстовом файле
+    bool result = DataProcessor::containsZeroInFile();
+    cout << "Текстовый файл " << (result ? "не содержит нуля." : "содержит ноль.") << endl;
 
-    // Для третьего задания
-    std::string textInputFilePath = "input_text.txt"; // Файл с текстом
-    std::string textOutputFilePath = "output_text.txt"; // Файл для записи строк
-    char endingChar = 'e'; // Задайте символ, на который должны оканчиваться строки
+    // Задание 5: Заполнение текстового файла несколькими числами в строке
+    DataProcessor::fillMultipleTextFile();
 
-    // Запись тестового текста в файл (например, это исходный текст)
-    std::ofstream testTextFile(textInputFilePath);
-    if (testTextFile.is_open()) {
-        testTextFile << "Tyger Tyger, burning bright" << std::endl;
-        testTextFile << "In the forests of the night" << std::endl;
-        testTextFile << "What immortal hand or eye" << std::endl;
-        testTextFile << "Could frame thy fearful symmetry" << std::endl;
-        testTextFile << "In what distant deeps or skies" << std::endl;
-        testTextFile << "Burnt the fire of thine eyes" << std::endl;
-        testTextFile << "On what wings dare he aspire" << std::endl;
-        testTextFile << "What the hand, dare seize the fire" << std::endl;
-        testTextFile << "And what shoulder, & what art" << std::endl;
-        testTextFile << "Could twist the sinews of thy heart" << std::endl;
-        testTextFile << "And when thy heart began to beat" << std::endl;
-        testTextFile << "What dread hand? & what dread feet" << std::endl;
-        testTextFile.close();
-    }
+    // Задание 5: Нахождение максимального элемента в файле
+    int maxNumber = DataProcessor::findMaxInMultipleTextFile();
+    cout << "Максимальный элемент в файле с несколькими числами: " << maxNumber << endl;
 
-    // Копирование строк, оканчивающихся на заданный символ
-    FileProcessor::CopyLinesEndingWithChar(textInputFilePath, textOutputFilePath, endingChar);
-    std::cout << "Строки, оканчивающиеся на '" << endingChar << "', были записаны в файл " << textOutputFilePath << std::endl;
+    // Задание 6: Копирование строк из одного файла в другой
+    // Пример использования функции: копировать строки, оканчивающиеся на 't'
+    // Создание исходного текстового файла с заданным текстом
+    DataProcessor::createSourceFile();
+    
+    // Копирование строк, оканчивающихся на 't', в другой файл
+    DataProcessor::copyLinesEndingWithChar('t');
 
+    cout << "Строки, оканчивающиеся на 't', переписаны в файл '" << DataProcessor::DESTINATION_TEXT_FILENAME << "'." << endl;
     return 0;
 }
+
 
 
 
